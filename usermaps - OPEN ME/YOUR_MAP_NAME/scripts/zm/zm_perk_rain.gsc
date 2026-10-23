@@ -5,10 +5,6 @@
 #insert scripts\shared\shared.gsh;
 #insert scripts\shared\version.gsh;
 
-#using scripts\zm\_zm_utility;
-
-
-
 /*
     Please Credit if you use this: 
     Coolyer
@@ -40,11 +36,14 @@
 #define PERK_RAIN_MODE             0
 #define PERK_RAIN_INTERVAL_MIN     1
 #define PERK_RAIN_INTERVAL_MAX     2
+#define PERK_RAIN_SHOULD_RANDOMIZE true // change this to false if you want the perk machines to spawn in the same order every time
+//shid 10/10/26 - add option to not randomize thank you shid<3
 
 #define PERK_RAIN_LOTTERY_FX_FRONT  "dlc5/sumpf/fx_perk_lottery_front"
 #define PERK_RAIN_LOTTERY_FX_END    "dlc5/sumpf/fx_perk_lottery_end"
 #define PERK_RAIN_LOTTERY_FX_FLASH  "dlc5/sumpf/fx_perk_lottery_flash"
 #define PERK_RAIN_LOTTERY_FX_GRENADE "explosions/fx_exp_grenade_default"
+
 #precache( "fx", PERK_RAIN_LOTTERY_FX_FRONT );
 #precache( "fx", PERK_RAIN_LOTTERY_FX_END );
 #precache( "fx", PERK_RAIN_LOTTERY_FX_FLASH );
@@ -52,13 +51,10 @@
 
 function autoexec __init__sytem__()
 {
-    system::register( "zm_perk_rain", &__init__, undefined, undefined );
+    system::register( "zm_perk_rain", &init, undefined, undefined );
+
 }
 
-function __init__()
-{
-    level thread perk_rain_init();
-}
 function perk_rain_get_lottery_fx( perk_str )
 {
     perk_low = ToLower( perk_str );
@@ -78,6 +74,21 @@ function perk_rain_get_lottery_fx( perk_str )
     */ 
     // default perk fx can change
     return PERK_RAIN_LOTTERY_FX_FRONT;
+}
+
+function init()
+{
+    level waittill( "initial_blackscreen_passed" );
+
+    machines = GetEntArray( "perk_machine", "targetname" );
+    foreach ( m in machines )
+    {
+        if ( IsDefined( m.e_can_model ) )
+        {
+            m.e_can_model EnableLinkTo();
+            m.e_can_model LinkTo( m );
+        }
+    }
 }
 // ---------------------------------------------------------------------------
 // Init
@@ -100,7 +111,11 @@ function perk_rain_init()
         }
         if ( perk_names.size > 0 )
         {
-            shuffled = array::randomize( perk_names );
+            if(PERK_RAIN_SHOULD_RANDOMIZE)
+                shuffled = array::randomize( perk_names );
+            else
+                shuffled = perk_names;
+
             for ( i = 0; i < valid_locs.size; i++ )
                 valid_locs[ i ].script_noteworthy = shuffled[ i % shuffled.size ];
         }
@@ -119,8 +134,18 @@ function perk_rain_init()
 
     if ( machines.size == 0 )
     {
-        IPrintLnBold( "^1Perk Rain: no perk machines found" );
+        //IPrintLnBold( "^1Perk Rain: no perk machines found" );
         return;
+    }
+
+    // Link Speed Cola's separately spawned can model to the machines fix by robbie73 <3
+    foreach ( m in machines )
+    {
+        if ( IsDefined( m.e_can_model ) )
+        {
+            m.e_can_model EnableLinkTo();
+            m.e_can_model LinkTo( m );
+        }
     }
 
     spots = struct::get_array( "perk_spot", "targetname" );
@@ -198,8 +223,18 @@ function perk_rain_init()
 // ---------------------------------------------------------------------------
 function perk_rain_initial_slam( machines, spots )
 {
-    shuffled_spots = array::randomize( spots );
-    shuffled_machines = array::randomize( machines );
+    if(PERK_RAIN_SHOULD_RANDOMIZE)
+    {
+        shuffled_spots = array::randomize( spots );
+        shuffled_machines = array::randomize( machines );
+    }
+    
+    else
+    {
+        shuffled_spots = spots;
+        shuffled_machines = machines;
+    }
+    
 
     if ( PERK_RAIN_MODE == 1 )
     {
@@ -342,8 +377,18 @@ function perk_rain_loop( machines, spots )
         next_shuffle = level.round_number + RandomIntRange( PERK_RAIN_INTERVAL_MIN, PERK_RAIN_INTERVAL_MAX );
         wait 1.5;
 
-        shuffled_spots = array::randomize( spots );
-        shuffled_machines = array::randomize( machines );
+        if(PERK_RAIN_SHOULD_RANDOMIZE)
+        {
+            shuffled_spots = array::randomize( spots );
+            shuffled_machines = array::randomize( machines );
+        }
+    
+        else
+        {
+            shuffled_spots = spots;
+            shuffled_machines = machines;
+        }
+        
         dests = [];
         angs = [];
         for ( i = 0; i < shuffled_machines.size; i++ )
@@ -449,6 +494,8 @@ function perk_rain_get_perk_str( m )
     return "";
 }
 
+
+
 function perk_rain_play_lottery_fx( m )
 {
     fx = perk_rain_get_lottery_fx( perk_rain_get_perk_str( m ) );
@@ -458,6 +505,10 @@ function perk_rain_play_lottery_fx( m )
 function perk_rain_show( m )
 {
     m Show();
+    if ( isdefined( m.e_can_model ) )
+    {
+        m.e_can_model Show();
+    }
     if ( isdefined( m.perk_rain_trig ) )
     {
         if ( isdefined( m.perk_rain_trig.bump ) ) m.perk_rain_trig.bump Show();
@@ -468,6 +519,10 @@ function perk_rain_show( m )
 function perk_rain_hide( m )
 {
     m Hide();
+    if ( isdefined( m.e_can_model ) )
+    {
+        m.e_can_model Hide();
+    }
     if ( isdefined( m.perk_rain_trig ) )
     {
         if ( isdefined( m.perk_rain_trig.bump ) ) m.perk_rain_trig.bump Hide();
